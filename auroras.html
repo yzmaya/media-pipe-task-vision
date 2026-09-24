@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Auroras — pinta el cielo con las manos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pearl:#EEEAF4; --pearl-dim:rgba(238,234,244,.64);
+    --smoke:rgba(10,14,26,.55); --edge:rgba(200,255,225,.16);
+    --aur:#6DFFB0; --vio:#A58CFF;
+    font-family:"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color:var(--pearl);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#070a14;overflow:hidden}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #hud{pointer-events:none}
+  video{display:none}
+  .chip{background:var(--smoke);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--edge);border-radius:999px}
+  #back{position:fixed;top:max(14px, env(safe-area-inset-top));left:max(14px, env(safe-area-inset-left));z-index:6;
+    color:var(--pearl);text-decoration:none;font-weight:600;font-size:.88rem;padding:.45em 1em}
+  #back:focus-visible,button:focus-visible{outline:2px solid var(--aur);outline-offset:3px}
+  #intro{position:fixed;inset:0;display:grid;place-items:center;padding:24px;z-index:5;
+    background:radial-gradient(120% 90% at 50% 30%, rgba(7,10,20,.3), rgba(7,10,20,.92));transition:opacity .5s}
+  #intro.hide{opacity:0;pointer-events:none}
+  .intro-box{max-width:32rem}
+  .intro-box h1{font-weight:800;font-size:clamp(2.8rem,10vw,5.8rem);line-height:.92;letter-spacing:-.04em;margin:0 0 .35em;
+    background:linear-gradient(0deg,var(--aur) 10%,#5fd9d0 45%,var(--vio) 80%,#e07ac8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .intro-box p{font-size:1.05rem;line-height:1.5;color:var(--pearl-dim);margin:0 0 1.6rem;max-width:28rem}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  button{font:inherit;font-weight:600;font-size:.98rem;border-radius:999px;padding:.8em 1.3em;cursor:pointer;
+    border:1px solid var(--edge);background:transparent;color:var(--pearl)}
+  button.primary{background:var(--pearl);color:#070a14;border-color:var(--pearl)}
+  #panel{position:fixed;left:max(14px, env(safe-area-inset-left));bottom:max(14px, env(safe-area-inset-bottom));z-index:4;
+    width:min(290px, calc(100vw - 28px));background:var(--smoke);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--edge);border-radius:18px;padding:14px 16px;font-size:.88rem}
+  #panel summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+  #panel summary::-webkit-details-marker{display:none}
+  #panel summary::after{content:"+";opacity:.6}
+  #panel[open] summary::after{content:"–"}
+  .ctl{margin-top:12px}
+  .ctl label{display:flex;justify-content:space-between;color:var(--pearl-dim);margin-bottom:4px}
+  input[type=range]{width:100%;accent-color:var(--aur)}
+  .btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .btns button{padding:.5em .9em;font-size:.84rem}
+  #status{position:fixed;top:max(14px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:4;
+    padding:.45em 1em;font-size:.85rem;color:var(--pearl-dim);white-space:nowrap;transition:opacity .4s}
+  #status:empty{opacity:0}
+  @media (max-width:700px){ #status{top:calc(max(14px, env(safe-area-inset-top)) + 44px)} }
+  @media (prefers-reduced-motion: reduce){#intro{transition:none}}
+</style>
+</head>
+<body>
+<a id="back" class="chip" href="index.html">Menú</a>
+<canvas id="gl"></canvas>
+<canvas id="hud"></canvas>
+<video id="cam" playsinline muted></video>
+
+<div id="intro">
+  <div class="intro-box">
+    <h1>Auroras</h1>
+    <p>Estás frente a un lago congelado bajo el cielo del norte. Mueve las manos y el cielo se enciende: entre más rápido, más intensa la aurora.</p>
+    <div class="row">
+      <button class="primary" id="btnCam">Activar cámara</button>
+      <button id="btnMouse">Probar con el mouse</button>
+    </div>
+  </div>
+</div>
+
+<details id="panel">
+  <summary>Ajustes de la aurora</summary>
+  <div class="ctl"><label for="sens">Intensidad de la estela <span id="vSens"></span></label><input id="sens" type="range" min="0.2" max="2.5" step="0.05" value="1"></div>
+  <div class="ctl"><label for="life">Duración de la estela <span id="vLife"></span></label><input id="life" type="range" min="0" max="1" step="0.01" value="0.6"></div>
+  <div class="ctl"><label for="rise">Deriva hacia arriba <span id="vRise"></span></label><input id="rise" type="range" min="0" max="2" step="0.05" value="1"></div>
+  <div class="ctl"><label for="body">Manos luminosas <span id="vBody"></span></label><input id="body" type="range" min="0" max="1" step="0.01" value="0.25"></div>
+  <div class="ctl"><label for="ghost">Ver cámara <span id="vGhost"></span></label><input id="ghost" type="range" min="0" max="1" step="0.01" value="0.15"></div>
+  <div class="btns">
+    <button id="btnReset">Apagar el cielo</button>
+    <button id="btnDots">Mostrar manos</button>
+  </div>
+</details>
+<div id="status" class="chip"></div>
+
+<script type="module">
+/* ================= Parámetros ================= */
+const P={ sens:1, life:.6, rise:1, body:.25, ghost:.15 };
+for(const key of Object.keys(P)){
+  const el=document.getElementById(key), out=document.getElementById('v'+key[0].toUpperCase()+key.slice(1));
+  const upd=()=>{ P[key]=parseFloat(el.value); out.textContent=P[key].toFixed(2); };
+  el.addEventListener('input',upd); upd();
+}
+const statusEl=document.getElementById('status');
+const setStatus=t=>statusEl.textContent=t;
+
+/* ================= WebGL2 ================= */
+const glc=document.getElementById('gl'), hud=document.getElementById('hud'), hctx=hud.getContext('2d');
+const gl=glc.getContext('webgl2',{antialias:false});
+if(!gl){ setStatus('Tu navegador no soporta WebGL2. Prueba en Chrome o Edge.'); throw new Error('no webgl2'); }
+if(!gl.getExtension('EXT_color_buffer_float')){ setStatus('Tu tarjeta de video no soporta este efecto.'); throw new Error('no float fb'); }
+gl.getExtension('OES_texture_float_linear');
+
+const MAXSEG=64;
+const VS=`#version 300 es
+in vec2 p; out vec2 vUv;
+void main(){ vUv=vec2(p.x*.5+.5,.5-p.y*.5); gl_Position=vec4(p,0.,1.); }`;
+
+const NOISE=`
+float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
+float fbm(vec2 p){ float a=.5, s=0.; for(int i=0;i<5;i++){ s+=a*noise(p); p*=2.03; a*=.5; } return s; }`;
+
+/* Estado: R = intensidad de luz, G = edad (0 recién emitida, 1 vieja) */
+const SIM=`#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uState;
+uniform vec2 uPx;
+uniform float uAspect, uTime, uDecay, uAge, uRise;
+uniform vec4 uA[${MAXSEG}];
+uniform vec4 uB[${MAXSEG}];
+uniform int uCount;
+${NOISE}
+void main(){
+  vec2 tc=gl_FragCoord.xy*uPx;
+  float sway=(fbm(vec2(tc.x*3.,tc.y*2.-uTime*.12))-.5)*.006*uRise;
+  vec2 back=tc-vec2(sway,.0026*uRise);
+  vec4 s=texture(uState,back);
+  float I=s.r*uDecay;
+  float age=min(1.,s.g+uAge);
+  vec2 pp=vec2(tc.x*uAspect,1.-tc.y);
+  float add=0.;
+  for(int i=0;i<${MAXSEG};i++){
+    if(i>=uCount) break;
+    vec2 a=vec2(uA[i].x*uAspect,uA[i].y), b=vec2(uA[i].z*uAspect,uA[i].w);
+    vec2 pa=pp-a, ba=b-a;
+    float h=clamp(dot(pa,ba)/max(dot(ba,ba),1e-9),0.,1.);
+    vec2 q=pa-ba*h;
+    q.y*=uB[i].z;                       // núcleo alargado en vertical: forma de cortina
+    float r=uB[i].y;
+    add+=uB[i].x*exp(-dot(q,q)/(r*r));
+  }
+  float nI=I+add;
+  age=mix(age,0.,clamp(add/(nI+1e-4),0.,1.));
+  o=vec4(min(nI,6.),age,0.,1.);
+}`;
+
+const RENDER=`#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uState, uVid;
+uniform vec2 uS, uPx;
+uniform float uAspect, uHasVid, uCam, uTime;
+${NOISE}
+const float LAKE=.745;
+
+vec3 auroraCol(float a){
+  a=clamp(a,0.,1.)*4.;
+  vec3 c0=vec3(.8,1.,.88), c1=vec3(.25,1.,.55), c2=vec3(.1,.85,.75), c3=vec3(.45,.35,1.), c4=vec3(.9,.3,.7);
+  if(a<1.) return mix(c0,c1,a);
+  if(a<2.) return mix(c1,c2,a-1.);
+  if(a<3.) return mix(c2,c3,a-2.);
+  return mix(c3,c4,a-3.);
+}
+vec3 auroraLight(vec2 uv){
+  vec2 tc=vec2(uv.x,1.-uv.y);
+  vec4 s=texture(uState,tc);
+  float rays=.45+.75*noise(vec2(uv.x*uAspect*70.,uv.y*1.8+uTime*.35));
+  rays*=.8+.4*noise(vec2(uv.x*uAspect*9.-uTime*.2,uTime*.1));
+  float wide=0.;
+  for(int i=0;i<8;i++){ float a=float(i)*.785+.3; wide+=texture(uState,tc+vec2(cos(a),sin(a))*uPx*10.).r; }
+  wide/=8.;
+  return (auroraCol(s.g)*(1.-exp(-s.r*rays*1.3)) + auroraCol(s.g+.15)*(1.-exp(-wide*.9))*.5)*1.2;
+}
+vec3 sky(vec2 uv){
+  float x=uv.x*uAspect;
+  vec3 c=mix(vec3(.008,.015,.05), vec3(.03,.09,.14), smoothstep(.05,.75,uv.y));
+  // estrellas que titilan
+  vec2 sp=vec2(x,uv.y)*300.; vec2 ci=floor(sp); float h=hash(ci);
+  float tw=.55+.45*sin(uTime*(1.5+h*3.)+h*60.);
+  c+=step(.9955,h)*tw*smoothstep(.45,.0,length(fract(sp)-.5))*(1.1-uv.y);
+  // Vía Láctea tenue
+  float mw=exp(-pow((uv.y-.18-x*.12)/.1,2.))*fbm(vec2(x*6.,uv.y*6.));
+  c+=vec3(.08,.08,.12)*mw;
+  // aurora natural de fondo, muy suave
+  float band=exp(-pow((uv.y-(.3+.05*sin(x*1.7+uTime*.07)))/.09,2.));
+  float cur=.5+.5*noise(vec2(x*28.,uTime*.25))*noise(vec2(x*3.+uTime*.05,1.));
+  c+=vec3(.1,.55,.32)*band*cur*.13;
+  return c;
+}
+float trees(vec2 uv){
+  float base=LAKE+.004, cw=.011;
+  float gx=uv.x*uAspect/cw, ci=floor(gx), fx=fract(gx)-.5;
+  float hh=(.018+hash(vec2(ci,5.))*.05)*(.35+.9*noise(vec2(ci*.07,2.)));
+  float top=base-hh;
+  if(uv.y<top||uv.y>base) return 0.;
+  float k=(uv.y-top)/hh;
+  float w=.55*k*(.75+.25*abs(sin(k*26.)));
+  return step(abs(fx),w);
+}
+vec3 landscape(vec2 uv, vec3 amb){
+  float x=uv.x*uAspect;
+  vec3 col=sky(uv)+auroraLight(uv);
+  float m1=.6-fbm(vec2(x*1.5,1.3))*.2;
+  if(uv.y>m1){
+    float d=uv.y-m1;
+    float snow=smoothstep(.035,.0,d)*(.6+.4*noise(vec2(x*40.,uv.y*40.)));
+    vec3 rock=vec3(.035,.05,.085)+amb*.35;
+    col=mix(rock, vec3(.42,.5,.62)+amb*.6, snow*.7) + auroraLight(uv)*.12;
+  }
+  float m2=.715-fbm(vec2(x*3.1+7.,3.))*.1;
+  if(uv.y>m2){
+    float d=uv.y-m2;
+    col=vec3(.015,.025,.04)+amb*.18 + vec3(.3,.36,.45)*smoothstep(.012,.0,d)*.5;
+  }
+  if(trees(uv)>.5) col=vec3(.004,.008,.012)+amb*.03;
+  return col;
+}
+void main(){
+  vec2 uv=vUv;
+  // luz ambiental: cuánto brilla el cielo ahora mismo
+  float ai=0.;
+  for(int i=0;i<6;i++){ ai+=texture(uState,vec2(.1+float(i)*.16,.55)).r + texture(uState,vec2(.15+float(i)*.15,.8)).r; }
+  vec3 amb=vec3(.15,.9,.55)*(1.-exp(-ai*.08))*.35;
+
+  vec3 col;
+  if(uv.y<LAKE){
+    col=landscape(uv,amb);
+  }else{
+    // lago congelado: refleja el cielo con ondulación leve
+    float dy=uv.y-LAKE;
+    vec2 r=vec2(uv.x+sin(uv.y*240.+uTime*1.2)*.0012*(1.+dy*20.)+(noise(vec2(uv.x*uAspect*30.,uv.y*200.))-.5)*.004, LAKE-dy*1.05);
+    col=landscape(r,amb)*vec3(.5,.6,.72);
+    float fres=smoothstep(.0,.25,dy);
+    col=mix(col, vec3(.03,.05,.08)+amb*.5, fres*.55);
+    col+=vec3(.5,.6,.7)*pow(noise(vec2(uv.x*uAspect*400.,uv.y*60.)),12.)*.3;   // destellos del hielo
+  }
+  // tu silueta, muy tenue, para que sepas dónde estás
+  if(uHasVid>.5 && uCam>0.){
+    vec2 vu=.5+(uv-.5)*uS; vu.x=1.-vu.x;
+    float L=dot(texture(uVid,clamp(vu,.001,.999)).rgb,vec3(.3,.59,.11));
+    col+=vec3(.35,.6,.8)*L*uCam;
+  }
+  o=vec4(col,1.);
+}`;
+
+function sh(t,s){ const x=gl.createShader(t); gl.shaderSource(x,s); gl.compileShader(x);
+  if(!gl.getShaderParameter(x,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; }
+function mkProg(fs){ const pr=gl.createProgram(); gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
+  gl.bindAttribLocation(pr,0,'p'); gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+  const U={}; const n=gl.getProgramParameter(pr,gl.ACTIVE_UNIFORMS);
+  for(let i=0;i<n;i++){ const nm=gl.getActiveUniform(pr,i).name.replace('[0]',''); U[nm]=gl.getUniformLocation(pr,nm); }
+  return {pr,U}; }
+const sim=mkProg(SIM), ren=mkProg(RENDER);
+
+gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+
+function texParams(){ for(const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,v); }
+function mkTarget(w,h){
+  const tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tex); texParams();
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+  const fb=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
+  gl.clearColor(0,1,0,0); gl.clear(gl.COLOR_BUFFER_BIT); gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  return {tex,fb};
+}
+const vidTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,vidTex); texParams();
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+
+let W=0,H=0,DPR=1,simW=0,simH=0,A=null,B=null;
+function resize(){
+  DPR=Math.min(devicePixelRatio||1,2); W=Math.floor(innerWidth*DPR); H=Math.floor(innerHeight*DPR);
+  glc.width=hud.width=W; glc.height=hud.height=H;
+  simW=innerWidth<700?300:480; simH=Math.max(64,Math.round(simW*H/W));
+  for(const t of [A,B]) if(t){ gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+  A=mkTarget(simW,simH); B=mkTarget(simW,simH);
+}
+addEventListener('resize',resize); resize();
+function clearTrails(){ for(const t of [A,B]){ gl.bindFramebuffer(gl.FRAMEBUFFER,t.fb); gl.clearColor(0,1,0,0); gl.clear(gl.COLOR_BUFFER_BIT); } gl.bindFramebuffer(gl.FRAMEBUFFER,null); }
+
+/* ================= Filtro One Euro ================= */
+class OneEuro{
+  constructor(minCut=1.4,beta=2.5,dCut=1){ Object.assign(this,{minCut,beta,dCut}); this.x=null; this.dx=0; this.t=0; }
+  a(c,dt){ const r=2*Math.PI*c*dt; return r/(r+1); }
+  f(x,t){ if(this.x===null){ this.x=x; this.t=t; return x; }
+    const dt=Math.max(1e-3,(t-this.t)/1000); this.t=t;
+    this.dx+=this.a(this.dCut,dt)*((x-this.x)/dt-this.dx);
+    this.x+=this.a(this.minCut+this.beta*Math.abs(this.dx),dt)*(x-this.x); return this.x; }
+}
+
+/* ================= Manos ================= */
+const TRAIL=[4,8,12,16,20,9];   // yemas + centro de la palma
+const BONES=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+const joints=new Map();
+let hands=[];
+
+function track(id,rx,ry,now){
+  const asp=W/H; let j=joints.get(id);
+  if(!j){ j={fx:new OneEuro(),fy:new OneEuro(),sp:0,t:now,fresh:true}; j.x=j.px=j.fx.f(rx,now); j.y=j.py=j.fy.f(ry,now); joints.set(id,j); return; }
+  const x=j.fx.f(rx,now), y=j.fy.f(ry,now), dt=Math.max(.008,(now-j.t)/1000);
+  j.sp=j.sp*.5+(Math.hypot((x-j.x)*asp,y-j.y)/dt)*.5; j.x=x; j.y=y; j.t=now; j.fresh=true;
+}
+
+const video=document.getElementById('cam');
+let hasVid=false, landmarker=null, lastVT=-1, S=[1,1], showSkel=false;
+function coverScale(){ if(!hasVid||!video.videoWidth) return [1,1];
+  const va=video.videoWidth/video.videoHeight, ca=W/H; return ca>va?[1,va/ca]:[ca/va,1]; }
+const toDisplay=lm=>({x:.5+((1-lm.x)-.5)/S[0], y:.5+(lm.y-.5)/S[1]});
+
+async function startCamera(){
+  setStatus('Pidiendo permiso de cámara…');
+  try{ const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=st; await video.play(); hasVid=true;
+  }catch{ setStatus('No se pudo abrir la cámara. Revisa el permiso del navegador; mientras, usa el mouse.'); return; }
+  setStatus('Cargando el detector de manos…');
+  try{
+    const { FilesetResolver, HandLandmarker } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+    const files=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',delegate:d},
+      runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5});
+    try{ landmarker=await HandLandmarker.createFromOptions(files,opts('GPU')); }
+    catch{ landmarker=await HandLandmarker.createFromOptions(files,opts('CPU')); }
+    setStatus('Listo: mueve las manos para encender el cielo'); setTimeout(()=>setStatus(''),4000);
+  }catch(e){ console.error(e); setStatus('No cargó el detector de manos (se necesita internet). El mouse sigue funcionando.'); }
+}
+
+function detect(now){
+  if(!landmarker||video.readyState<2||video.currentTime===lastVT) return;
+  lastVT=video.currentTime;
+  const res=landmarker.detectForVideo(video,now), seen=new Set();
+  hands=[];
+  (res.landmarks||[]).forEach((lm,i)=>{
+    const side=res.handednesses?.[i]?.[0]?.categoryName||('h'+i);
+    const pts=lm.map(toDisplay); hands.push(pts);
+    for(const k of TRAIL){ const id=side+'-'+k; track(id,pts[k].x,pts[k].y,now); seen.add(id); }
+  });
+  for(const id of [...joints.keys()]) if(!id.startsWith('ptr') && !seen.has(id)) joints.delete(id);
+}
+
+/* ================= Mouse / touch ================= */
+const evUV=e=>({x:e.clientX/innerWidth,y:e.clientY/innerHeight});
+glc.addEventListener('pointerdown',e=>{ glc.setPointerCapture(e.pointerId); const p=evUV(e); track('ptr'+e.pointerId,p.x,p.y,performance.now()); });
+glc.addEventListener('pointermove',e=>{ if(!joints.has('ptr'+e.pointerId)) return; const p=evUV(e); track('ptr'+e.pointerId,p.x,p.y,performance.now()); });
+const up=e=>joints.delete('ptr'+e.pointerId);
+glc.addEventListener('pointerup',up); glc.addEventListener('pointercancel',up);
+
+/* ================= Emisión ================= */
+const uA=new Float32Array(MAXSEG*4), uB=new Float32Array(MAXSEG*4);
+function buildSegments(){
+  let n=0;
+  for(const j of joints.values()){
+    if(!j.fresh) j.sp*=.85;
+    const sp=Math.max(0,j.sp-.15);
+    if(n<MAXSEG && sp>0){
+      const str=Math.min(sp,3.5)*.16*P.sens, rad=.012+.016*Math.min(sp/2.5,1);
+      uA.set([j.px,j.py,j.x,j.y],n*4); uB.set([str,rad,.35,0],n*4); n++;
+    }
+    j.px=j.x; j.py=j.y; j.fresh=false;
+  }
+  if(P.body>0) for(const pts of hands) for(const [a,b] of BONES){
+    if(n>=MAXSEG) break;
+    uA.set([pts[a].x,pts[a].y,pts[b].x,pts[b].y],n*4); uB.set([.03*P.body,.006,1,0],n*4); n++;
+  }
+  return n;
+}
+
+/* ================= HUD ================= */
+function drawHud(){
+  hctx.clearRect(0,0,W,H); if(!showSkel) return;
+  hctx.strokeStyle='rgba(200,255,225,.5)'; hctx.fillStyle='rgba(238,234,244,.85)'; hctx.lineWidth=1.5*DPR;
+  for(const pts of hands){
+    for(const [a,b] of BONES){ hctx.beginPath(); hctx.moveTo(pts[a].x*W,pts[a].y*H); hctx.lineTo(pts[b].x*W,pts[b].y*H); hctx.stroke(); }
+    for(const k of TRAIL){ hctx.beginPath(); hctx.arc(pts[k].x*W,pts[k].y*H,3*DPR,0,7); hctx.fill(); }
+  }
+}
+
+/* ================= Loop ================= */
+function frame(t){
+  S=coverScale(); detect(t);
+  const count=buildSegments();
+  const decay=.945+.048*P.life;
+
+  gl.useProgram(sim.pr); gl.viewport(0,0,simW,simH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,B.fb);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,A.tex);
+  gl.uniform1i(sim.U.uState,0); gl.uniform2f(sim.U.uPx,1/simW,1/simH);
+  gl.uniform1f(sim.U.uAspect,W/H); gl.uniform1f(sim.U.uTime,(t*.001)%1000);
+  gl.uniform1f(sim.U.uDecay,decay); gl.uniform1f(sim.U.uAge,(1-decay)*1.3); gl.uniform1f(sim.U.uRise,P.rise);
+  gl.uniform4fv(sim.U.uA,uA); gl.uniform4fv(sim.U.uB,uB); gl.uniform1i(sim.U.uCount,count);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  [A,B]=[B,A];
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H);
+  gl.useProgram(ren.pr);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,A.tex);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,vidTex);
+  if(hasVid&&video.readyState>=2) gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video);
+  gl.uniform1i(ren.U.uState,0); gl.uniform1i(ren.U.uVid,1);
+  gl.uniform2f(ren.U.uS,S[0],S[1]); gl.uniform2f(ren.U.uPx,1/simW,1/simH);
+  gl.uniform1f(ren.U.uAspect,W/H); gl.uniform1f(ren.U.uHasVid,hasVid?1:0);
+  gl.uniform1f(ren.U.uCam,P.ghost); gl.uniform1f(ren.U.uTime,(t*.001)%1000);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  drawHud();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ================= UI ================= */
+const intro=document.getElementById('intro');
+document.getElementById('btnCam').onclick=()=>{ intro.classList.add('hide'); startCamera(); };
+document.getElementById('btnMouse').onclick=()=>{ intro.classList.add('hide'); setStatus('Haz clic y arrastra para encender el cielo'); setTimeout(()=>setStatus(''),3500); };
+document.getElementById('btnReset').onclick=clearTrails;
+const bd=document.getElementById('btnDots');
+bd.onclick=()=>{ showSkel=!showSkel; bd.textContent=showSkel?'Ocultar manos':'Mostrar manos'; };
+if(innerWidth>700) document.getElementById('panel').open=true;
+</script>
+</body>
+</html>
