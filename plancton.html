@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Plancton — mar bioluminiscente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pearl:#E8F1FF; --pearl-dim:rgba(232,241,255,.64);
+    --smoke:rgba(4,10,30,.55); --edge:rgba(90,160,255,.22);
+    --glow:#3D8BFF; --cyan:#7FE6FF;
+    font-family:"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color:var(--pearl);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#01030b;overflow:hidden}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  video{display:none}
+  .chip{background:var(--smoke);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--edge);border-radius:999px}
+  #back{position:fixed;top:max(14px, env(safe-area-inset-top));left:max(14px, env(safe-area-inset-left));z-index:6;
+    color:var(--pearl);text-decoration:none;font-weight:600;font-size:.88rem;padding:.45em 1em}
+  #back:focus-visible,button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+  #intro{position:fixed;inset:0;display:grid;place-items:center;padding:24px;z-index:5;
+    background:radial-gradient(120% 90% at 50% 40%, rgba(1,3,11,.3), rgba(1,3,11,.93));transition:opacity .5s}
+  #intro.hide{opacity:0;pointer-events:none}
+  .intro-box{max-width:32rem}
+  .intro-box h1{font-weight:800;font-size:clamp(3rem,11vw,6.2rem);line-height:.9;letter-spacing:-.04em;margin:0 0 .35em;
+    background:linear-gradient(175deg,#fff 5%,var(--cyan) 35%,var(--glow) 70%,#1236a8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .intro-box p{font-size:1.05rem;line-height:1.5;color:var(--pearl-dim);margin:0 0 1.6rem;max-width:28rem}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  button{font:inherit;font-weight:600;font-size:.98rem;border-radius:999px;padding:.8em 1.3em;cursor:pointer;
+    border:1px solid var(--edge);background:transparent;color:var(--pearl)}
+  button.primary{background:var(--pearl);color:#01030b;border-color:var(--pearl)}
+  #panel{position:fixed;left:max(14px, env(safe-area-inset-left));bottom:max(14px, env(safe-area-inset-bottom));z-index:4;
+    width:min(290px, calc(100vw - 28px));background:var(--smoke);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--edge);border-radius:18px;padding:14px 16px;font-size:.88rem}
+  #panel summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+  #panel summary::-webkit-details-marker{display:none}
+  #panel summary::after{content:"+";opacity:.6}
+  #panel[open] summary::after{content:"–"}
+  .ctl{margin-top:12px}
+  .ctl label{display:flex;justify-content:space-between;color:var(--pearl-dim);margin-bottom:4px}
+  input[type=range]{width:100%;accent-color:var(--glow)}
+  .btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .btns button{padding:.5em .9em;font-size:.84rem}
+  #status{position:fixed;top:max(14px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:4;
+    padding:.45em 1em;font-size:.85rem;color:var(--pearl-dim);white-space:nowrap;transition:opacity .4s}
+  #status:empty{opacity:0}
+  @media (max-width:700px){ #status{top:calc(max(14px, env(safe-area-inset-top)) + 44px)} }
+  @media (prefers-reduced-motion: reduce){#intro{transition:none}}
+</style>
+</head>
+<body>
+<a id="back" class="chip" href="index.html">Menú</a>
+<canvas id="gl"></canvas>
+<video id="cam" playsinline muted></video>
+
+<div id="intro">
+  <div class="intro-box">
+    <h1>Plancton</h1>
+    <p>Estás dentro de un mar oscuro lleno de plancton bioluminiscente. Todo lo que mueves lo despierta: tu silueta, tus manos, tus dedos. Quédate quieto y el mar vuelve a apagarse.</p>
+    <div class="row">
+      <button class="primary" id="btnCam">Activar cámara</button>
+      <button id="btnMouse">Probar con el mouse</button>
+    </div>
+  </div>
+</div>
+
+<details id="panel">
+  <summary>Ajustes del mar</summary>
+  <div class="ctl"><label for="gain">Sensibilidad al movimiento <span id="vGain"></span></label><input id="gain" type="range" min="0.2" max="2.5" step="0.05" value="1"></div>
+  <div class="ctl"><label for="life">Duración del brillo <span id="vLife"></span></label><input id="life" type="range" min="0" max="1" step="0.01" value="0.6"></div>
+  <div class="ctl"><label for="dens">Densidad de plancton <span id="vDens"></span></label><input id="dens" type="range" min="0.1" max="1" step="0.01" value="0.65"></div>
+  <div class="ctl"><label for="flow">Corriente <span id="vFlow"></span></label><input id="flow" type="range" min="0" max="2" step="0.05" value="0.8"></div>
+  <div class="ctl"><label for="ghost">Ver cámara <span id="vGhost"></span></label><input id="ghost" type="range" min="0" max="1" step="0.01" value="0.06"></div>
+  <div class="btns"><button id="btnReset">Apagar el mar</button></div>
+</details>
+<div id="status" class="chip"></div>
+
+<script type="module">
+/* ================= Parámetros ================= */
+const P={ gain:1, life:.6, dens:.65, flow:.8, ghost:.06 };
+for(const key of Object.keys(P)){
+  const el=document.getElementById(key), out=document.getElementById('v'+key[0].toUpperCase()+key.slice(1));
+  const upd=()=>{ P[key]=parseFloat(el.value); out.textContent=P[key].toFixed(2); };
+  el.addEventListener('input',upd); upd();
+}
+const statusEl=document.getElementById('status');
+const setStatus=t=>statusEl.textContent=t;
+
+/* ================= WebGL2 ================= */
+const glc=document.getElementById('gl');
+const gl=glc.getContext('webgl2',{antialias:false});
+if(!gl){ setStatus('Tu navegador no soporta WebGL2. Prueba en Chrome o Edge.'); throw new Error('no webgl2'); }
+if(!gl.getExtension('EXT_color_buffer_float')){ setStatus('Tu tarjeta de video no soporta este efecto.'); throw new Error('no float fb'); }
+gl.getExtension('OES_texture_float_linear');
+
+const VS=`#version 300 es
+in vec2 p; out vec2 vUv;
+void main(){ vUv=vec2(p.x*.5+.5,.5-p.y*.5); gl_Position=vec4(p,0.,1.); }`;
+
+const COMMON=`
+float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
+uniform vec2 uS;
+vec2 toVid(vec2 uv){ vec2 vu=.5+(uv-.5)*uS; vu.x=1.-vu.x; return clamp(vu,.001,.999); }`;
+
+/* 1) Luminancia de la cámara en espacio de pantalla, suavizada (para comparar cuadros) */
+const LUM=`#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uVid; uniform vec2 uPx;
+${COMMON}
+void main(){
+  vec2 tc=gl_FragCoord.xy*uPx, uv=vec2(tc.x,1.-tc.y);
+  vec3 w=vec3(.3,.59,.11); float s=0.;
+  for(int i=-1;i<=1;i++) for(int j=-1;j<=1;j++) s+=dot(texture(uVid,toVid(uv+vec2(i,j)*uPx*1.5)).rgb,w);
+  o=vec4(s/9.,0.,0.,1.);
+}`;
+
+/* 2) Excitación del plancton: R = brillo, se mueve con la corriente y se apaga lento */
+const SIM=`#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uE, uLumNow, uLumPrev, uMaskNow, uMaskPrev;
+uniform vec2 uPx;
+uniform float uAspect, uTime, uDecay, uGain, uFlow, uHasVid, uHasMask, uFresh;
+uniform vec4 uPtr;
+${COMMON}
+void main(){
+  vec2 tc=gl_FragCoord.xy*uPx, uv=vec2(tc.x,1.-tc.y);
+  // corriente marina lenta
+  vec2 q=vec2(uv.x*uAspect,uv.y)*2.5;
+  vec2 cur=(vec2(noise(q+uTime*.06),noise(q+17.-uTime*.05))-.5)*.0025*uFlow;
+  vec2 b=tc-vec2(cur.x,-cur.y)-vec2(0.,.0003*uFlow);
+  float e=texture(uE,b).r*.6
+        +(texture(uE,b+vec2(uPx.x,0.)).r+texture(uE,b-vec2(uPx.x,0.)).r
+         +texture(uE,b+vec2(0.,uPx.y)).r+texture(uE,b-vec2(0.,uPx.y)).r)*.1;
+  e*=uDecay;
+
+  float m=0.;
+  if(uHasVid>.5 && uFresh>.5){
+    float d=abs(texture(uLumNow,tc).r-texture(uLumPrev,tc).r);
+    float lm=smoothstep(.04,.16,d);
+    if(uHasMask>.5){
+      vec2 vu=toVid(uv);
+      float mn=texture(uMaskNow,vu).r, mp=texture(uMaskPrev,vu).r;
+      float edge=smoothstep(.12,.45,abs(mn-mp));          // la silueta que se desplaza
+      m=max(edge, lm*smoothstep(.08,.4,max(mn,mp)));      // movimiento dentro del cuerpo (manos, dedos)
+    }else{
+      m=smoothstep(.07,.22,d);
+    }
+  }
+  if(uPtr.w>.5){ vec2 dd=(uv-uPtr.xy)*vec2(uAspect,1.); m=max(m,exp(-dot(dd,dd)/.0012)*clamp(uPtr.z,0.,1.5)); }
+  e+=m*uGain*.55;
+  o=vec4(min(e,4.),0.,0.,1.);
+}`;
+
+/* 3) Render: puntos de plancton que solo se ven donde hay excitación */
+const RENDER=`#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uE, uVid;
+uniform vec2 uPx;
+uniform float uAspect, uTime, uDens, uGhost, uHasVid, uFlow;
+${COMMON}
+float plankton(vec2 uv){
+  float s=0.;
+  for(int k=0;k<3;k++){
+    float fk=float(k), sc=150.+fk*110.;
+    vec2 p=vec2(uv.x*uAspect,uv.y)*sc;
+    p+=vec2(uTime*(.6+fk*.4), sin(uTime*.2+fk)*1.5)*uFlow;     // derivan con el agua
+    vec2 c=floor(p), f=fract(p)-.5;
+    float h=hash(c+fk*31.7);
+    vec2 off=(vec2(hash(c+1.3),hash(c+7.1))-.5)*.6;
+    float r=.07+.1*hash(c+3.3);
+    float tw=.55+.45*sin(uTime*(2.+h*3.)+h*50.);
+    s+=smoothstep(r,0.,length(f-off))*step(1.-uDens,h)*tw;
+  }
+  return s;
+}
+void main(){
+  vec2 uv=vUv, tc=vec2(uv.x,1.-uv.y);
+  float E=texture(uE,tc).r;
+  float w1=0., w2=0.;
+  for(int i=0;i<8;i++){ float a=float(i)*.785+.2; vec2 d=vec2(cos(a),sin(a));
+    w1+=texture(uE,tc+d*uPx*6.).r; w2+=texture(uE,tc+d*uPx*16.).r; }
+  w1/=8.; w2/=8.;
+
+  float pl=plankton(uv);
+  float light=E*(pl*1.7+.22) + w1*.22 + w2*.14;
+
+  vec3 deep=vec3(.002,.006,.025);
+  vec3 col=deep+vec3(.0,.02,.06)*noise(uv*vec2(uAspect,1.)*3.+uTime*.03);
+  if(uHasVid>.5 && uGhost>0.){
+    float L=dot(texture(uVid,toVid(uv)).rgb,vec3(.3,.59,.11));
+    col+=vec3(.05,.12,.3)*L*uGhost*3.;
+  }
+  vec3 blue=vec3(.03,.18,1.), cyan=vec3(.25,.85,1.), white=vec3(.85,.97,1.);
+  vec3 glow=mix(blue,cyan,smoothstep(.35,1.1,light));
+  glow=mix(glow,white,smoothstep(1.2,2.4,light));
+  col+=glow*(1.-exp(-light*1.6))*1.15;
+  o=vec4(col,1.);
+}`;
+
+function sh(t,s){ const x=gl.createShader(t); gl.shaderSource(x,s); gl.compileShader(x);
+  if(!gl.getShaderParameter(x,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; }
+function mkProg(fs){ const pr=gl.createProgram(); gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
+  gl.bindAttribLocation(pr,0,'p'); gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+  const U={}; const n=gl.getProgramParameter(pr,gl.ACTIVE_UNIFORMS);
+  for(let i=0;i<n;i++){ const nm=gl.getActiveUniform(pr,i).name.replace('[0]',''); U[nm]=gl.getUniformLocation(pr,nm); }
+  return {pr,U}; }
+const lumP=mkProg(LUM), simP=mkProg(SIM), renP=mkProg(RENDER);
+
+gl.bindBuffer(gl.ARRAY_BUFFER,gl.createBuffer());
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+
+function tex(){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t);
+  for(const [k,v] of [[gl.TEXTURE_MIN_FILTER,gl.LINEAR],[gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D,k,v);
+  return t; }
+function mkTarget(w,h){ const t=tex(); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+  const fb=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT); gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  return {tex:t,fb}; }
+
+const vidTex=tex(); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+let maskNow=tex(), maskPrev=tex();
+for(const m of [maskNow,maskPrev]){ gl.bindTexture(gl.TEXTURE_2D,m); gl.texImage2D(gl.TEXTURE_2D,0,gl.R16F,1,1,0,gl.RED,gl.FLOAT,new Float32Array([0])); }
+let hasMask=false;
+
+let W=0,H=0,DPR=1,sw=0,shh=0,EA,EB,LA,LB;
+function resize(){
+  DPR=Math.min(devicePixelRatio||1,2); W=Math.floor(innerWidth*DPR); H=Math.floor(innerHeight*DPR);
+  glc.width=W; glc.height=H;
+  sw=innerWidth<700?260:400; shh=Math.max(64,Math.round(sw*H/W));
+  for(const t of [EA,EB,LA,LB]) if(t){ gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+  EA=mkTarget(sw,shh); EB=mkTarget(sw,shh); LA=mkTarget(sw,shh); LB=mkTarget(sw,shh);
+}
+addEventListener('resize',resize); resize();
+function darken(){ for(const t of [EA,EB]){ gl.bindFramebuffer(gl.FRAMEBUFFER,t.fb); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT); } gl.bindFramebuffer(gl.FRAMEBUFFER,null); }
+
+/* ================= Cámara + segmentación de persona ================= */
+const video=document.getElementById('cam');
+let hasVid=false, segmenter=null, lastVT=-1, S=[1,1], lumCount=0;
+function coverScale(){ if(!hasVid||!video.videoWidth) return [1,1];
+  const va=video.videoWidth/video.videoHeight, ca=W/H; return ca>va?[1,va/ca]:[ca/va,1]; }
+
+async function startCamera(){
+  setStatus('Pidiendo permiso de cámara…');
+  try{ const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=st; await video.play(); hasVid=true;
+  }catch{ setStatus('No se pudo abrir la cámara. Revisa el permiso del navegador; mientras, usa el mouse.'); return; }
+  setStatus('Despertando al plancton…');
+  try{
+    const { FilesetResolver, ImageSegmenter } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+    const files=await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const opts=d=>({baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',delegate:d},
+      runningMode:'VIDEO', outputConfidenceMasks:true, outputCategoryMask:false});
+    try{ segmenter=await ImageSegmenter.createFromOptions(files,opts('GPU')); }
+    catch{ segmenter=await ImageSegmenter.createFromOptions(files,opts('CPU')); }
+    setStatus('Listo: muévete despacio y mira cómo se enciende'); setTimeout(()=>setStatus(''),4000);
+  }catch(e){ console.error(e); setStatus('Sin detector de cuerpo: reacciono a todo el movimiento de la cámara.'); setTimeout(()=>setStatus(''),5000); }
+}
+
+function segment(now){
+  segmenter.segmentForVideo(video,now,res=>{
+    const masks=res.confidenceMasks; if(!masks||!masks.length) return;
+    const mk=masks[masks.length-1], data=mk.getAsFloat32Array();
+    [maskNow,maskPrev]=[maskPrev,maskNow];
+    gl.bindTexture(gl.TEXTURE_2D,maskNow);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.R16F,mk.width,mk.height,0,gl.RED,gl.FLOAT,data);
+    if(!hasMask){ gl.bindTexture(gl.TEXTURE_2D,maskPrev); gl.texImage2D(gl.TEXTURE_2D,0,gl.R16F,mk.width,mk.height,0,gl.RED,gl.FLOAT,data); }
+    hasMask=true;
+  });
+}
+
+/* ================= Mouse / touch ================= */
+const ptr={x:0,y:0,sp:0,on:false,t:0};
+const evUV=e=>({x:e.clientX/innerWidth,y:e.clientY/innerHeight});
+glc.addEventListener('pointerdown',e=>{ glc.setPointerCapture(e.pointerId); const p=evUV(e); Object.assign(ptr,{x:p.x,y:p.y,on:true,sp:.5,t:performance.now()}); });
+glc.addEventListener('pointermove',e=>{ if(!ptr.on) return; const p=evUV(e), now=performance.now(), dt=Math.max(.008,(now-ptr.t)/1000);
+  ptr.sp=ptr.sp*.6+Math.hypot((p.x-ptr.x)*W/H,p.y-ptr.y)/dt*.4; Object.assign(ptr,{x:p.x,y:p.y,t:now}); });
+const up=()=>{ ptr.on=false; };
+glc.addEventListener('pointerup',up); glc.addEventListener('pointercancel',up);
+
+/* ================= Loop ================= */
+function draw(prog){ gl.useProgram(prog.pr); }
+function frame(t){
+  S=coverScale(); ptr.sp*=.9;
+  let fresh=false;
+  if(hasVid && video.readyState>=2 && video.currentTime!==lastVT){
+    lastVT=video.currentTime; fresh=true;
+    gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D,vidTex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video);
+    // luminancia: lo actual pasa a ser lo anterior
+    [LA,LB]=[LB,LA];
+    gl.useProgram(lumP.pr); gl.bindFramebuffer(gl.FRAMEBUFFER,LA.fb); gl.viewport(0,0,sw,shh);
+    gl.uniform1i(lumP.U.uVid,5); gl.uniform2f(lumP.U.uPx,1/sw,1/shh); gl.uniform2f(lumP.U.uS,S[0],S[1]);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    lumCount++;
+    if(segmenter) segment(t);
+  }
+
+  // excitación
+  gl.useProgram(simP.pr); gl.bindFramebuffer(gl.FRAMEBUFFER,EB.fb); gl.viewport(0,0,sw,shh);
+  const bind=(u,t,loc)=>{ gl.activeTexture(gl.TEXTURE0+u); gl.bindTexture(gl.TEXTURE_2D,t); gl.uniform1i(loc,u); };
+  bind(0,EA.tex,simP.U.uE); bind(1,LA.tex,simP.U.uLumNow); bind(2,LB.tex,simP.U.uLumPrev);
+  bind(3,maskNow,simP.U.uMaskNow); bind(4,maskPrev,simP.U.uMaskPrev);
+  gl.uniform2f(simP.U.uPx,1/sw,1/shh); gl.uniform2f(simP.U.uS,S[0],S[1]); gl.uniform1f(simP.U.uAspect,W/H);
+  gl.uniform1f(simP.U.uTime,(t*.001)%1000); gl.uniform1f(simP.U.uDecay,.94+.055*P.life); gl.uniform1f(simP.U.uGain,P.gain);
+  gl.uniform1f(simP.U.uFlow,P.flow); gl.uniform1f(simP.U.uHasVid,hasVid&&lumCount>2?1:0); gl.uniform1f(simP.U.uHasMask,hasMask?1:0);
+  gl.uniform1f(simP.U.uFresh,fresh?1:0);
+  gl.uniform4f(simP.U.uPtr,ptr.x,ptr.y,Math.min(ptr.sp,1.5),ptr.on?1:0);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  [EA,EB]=[EB,EA];
+
+  // render
+  gl.useProgram(renP.pr); gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H);
+  bind(0,EA.tex,renP.U.uE); bind(5,vidTex,renP.U.uVid);
+  gl.uniform2f(renP.U.uPx,1/sw,1/shh); gl.uniform2f(renP.U.uS,S[0],S[1]); gl.uniform1f(renP.U.uAspect,W/H);
+  gl.uniform1f(renP.U.uTime,(t*.001)%1000); gl.uniform1f(renP.U.uDens,P.dens); gl.uniform1f(renP.U.uGhost,P.ghost);
+  gl.uniform1f(renP.U.uHasVid,hasVid?1:0); gl.uniform1f(renP.U.uFlow,P.flow);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ================= UI ================= */
+const intro=document.getElementById('intro');
+document.getElementById('btnCam').onclick=()=>{ intro.classList.add('hide'); startCamera(); };
+document.getElementById('btnMouse').onclick=()=>{ intro.classList.add('hide'); setStatus('Haz clic y arrastra para agitar el agua'); setTimeout(()=>setStatus(''),3500); };
+document.getElementById('btnReset').onclick=darken;
+if(innerWidth>700) document.getElementById('panel').open=true;
+</script>
+</body>
+</html>

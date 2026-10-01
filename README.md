@@ -10,6 +10,7 @@ Experimentos interactivos que reaccionan a tus manos y a tu cuerpo frente a la c
 - **Agua**: la yema de tu dedo índice toca una superficie de agua; entre más rápido, más oleaje.
 - **Auroras**: tus manos encienden auroras boreales sobre un lago congelado.
 - **Hombre de arena**: tu cuerpo se cubre de arena tornasol que se desprende al moverte.
+- **Plancton**: un mar oscuro de plancton bioluminiscente que se enciende en azul con tu movimiento.
 
 ## Cómo está hecho
 

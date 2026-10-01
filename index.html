@@ -85,6 +85,20 @@
   @keyframes fall{from{background-position:0 0}to{background-position:0 44px}}
   @media (prefers-reduced-motion: reduce){ .arena .preview::before{animation:none} }
 
+  /* Vista previa: plancton bioluminiscente */
+  .plancton .preview{background:
+      radial-gradient(28% 22% at 55% 62%, rgba(127,230,255,.55), transparent 70%),
+      radial-gradient(45% 35% at 42% 55%, rgba(61,139,255,.45), transparent 72%),
+      radial-gradient(30% 50% at 22% 40%, rgba(30,70,220,.35), transparent 70%),
+      #01030b}
+  .plancton .preview::before{content:"";position:absolute;inset:0;
+    background-image:radial-gradient(circle, rgba(170,225,255,.9) 0 1px, transparent 1.6px);
+    background-size:7px 9px;
+    -webkit-mask-image:radial-gradient(40% 32% at 50% 58%, #000, transparent 75%);mask-image:radial-gradient(40% 32% at 50% 58%, #000, transparent 75%);
+    animation:drift 9s linear infinite}
+  @keyframes drift{from{background-position:0 0}to{background-position:70px 18px}}
+  @media (prefers-reduced-motion: reduce){ .plancton .preview::before{animation:none} }
+
   footer{margin-top:40px;font-size:.88rem;color:var(--pearl-dim);max-width:44rem;line-height:1.5}
 </style>
 </head>
@@ -133,6 +147,16 @@
         <p>Tu cuerpo se vuelve arena. Cada movimiento lo desmorona y los granos se desprenden y caen al suelo.</p>
         <p class="how">Aléjate de la cámara y muévete.</p>
         <span class="open">Abrir Hombre de arena</span>
+      </div>
+    </a>
+
+    <a class="card plancton" href="plancton.html">
+      <div class="preview" aria-hidden="true"></div>
+      <div class="body">
+        <h2>Plancton</h2>
+        <p>Un mar oscuro lleno de plancton bioluminiscente. Todo lo que mueves se enciende en azul y se apaga poco a poco.</p>
+        <p class="how">Muévete despacio frente a la cámara.</p>
+        <span class="open">Abrir Plancton</span>
       </div>
     </a>
   </div>
