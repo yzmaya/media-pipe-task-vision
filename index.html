@@ -99,6 +99,20 @@
   @keyframes drift{from{background-position:0 0}to{background-position:70px 18px}}
   @media (prefers-reduced-motion: reduce){ .plancton .preview::before{animation:none} }
 
+  /* Vista previa: líquido brillante */
+  .fluido .preview{background:
+      radial-gradient(18% 14% at 38% 40%, rgba(255,255,255,.75), transparent 60%),
+      radial-gradient(40% 38% at 40% 48%, #c7f23a 0 40%, transparent 70%),
+      radial-gradient(38% 34% at 62% 52%, #ffb13d 0 38%, transparent 72%),
+      radial-gradient(30% 30% at 72% 34%, #ff5a3d 0 30%, transparent 70%),
+      radial-gradient(26% 26% at 24% 66%, #5b8cff 0 30%, transparent 70%),
+      #020203}
+  .fluido .preview::before{content:"";position:absolute;inset:0;
+    background:repeating-radial-gradient(circle at 48% 50%, rgba(0,0,0,0) 0 9px, rgba(0,0,0,.22) 11px, rgba(255,255,255,.12) 12px, rgba(0,0,0,0) 14px);
+    mix-blend-mode:overlay;animation:swirl 14s linear infinite}
+  @keyframes swirl{to{transform:rotate(360deg) scale(1.15)}}
+  @media (prefers-reduced-motion: reduce){ .fluido .preview::before{animation:none} }
+
   footer{margin-top:40px;font-size:.88rem;color:var(--pearl-dim);max-width:44rem;line-height:1.5}
 </style>
 </head>
@@ -157,6 +171,16 @@
         <p>Un mar oscuro lleno de plancton bioluminiscente. Todo lo que mueves se enciende en azul y se apaga poco a poco.</p>
         <p class="how">Muévete despacio frente a la cámara.</p>
         <span class="open">Abrir Plancton</span>
+      </div>
+    </a>
+
+    <a class="card fluido" href="fluido.html">
+      <div class="preview" aria-hidden="true"></div>
+      <div class="body">
+        <h2>Fluido</h2>
+        <p>Tu cuerpo empuja un líquido espeso y brillante que gira en remolinos y cambia de color. Tú desapareces; solo queda el líquido.</p>
+        <p class="how">Muévete frente a la cámara, con gestos amplios.</p>
+        <span class="open">Abrir Fluido</span>
       </div>
     </a>
   </div>

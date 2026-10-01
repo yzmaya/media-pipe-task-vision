@@ -11,6 +11,7 @@ Experimentos interactivos que reaccionan a tus manos y a tu cuerpo frente a la c
 - **Auroras**: tus manos encienden auroras boreales sobre un lago congelado.
 - **Hombre de arena**: tu cuerpo se cubre de arena tornasol que se desprende al moverte.
 - **Plancton**: un mar oscuro de plancton bioluminiscente que se enciende en azul con tu movimiento.
+- **Fluido**: tu cuerpo empuja un líquido brillante simulado en tiempo real (Navier-Stokes en la GPU).
 
 ## Cómo está hecho
 
